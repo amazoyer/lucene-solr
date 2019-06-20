@@ -232,20 +232,34 @@ public class TestSynonymGraphFilter extends BaseTokenStreamTestCase {
 
   public void testInsertionInSynonymFile() throws Exception {
     String testFile =
-        "term1 ? term2, synonymterm";
+        "term1 ? term2, synonymterm1\n" +
+            "term1 terma, synonymterma";
 
     Analyzer analyzer = solrSynsToAnalyzer(testFile);
 
     // ? could be replaced by any term
-    assertAnalyzesTo(analyzer, "term1 dummyterm term2",
-        new String[]{"synonymterm", "term1" , "dummyterm", "term2"},
+    assertAnalyzesTo(analyzer, "term1 dummyterm1 term2",
+        new String[]{"synonymterm1", "term1" , "dummyterm1", "term2"},
         new int[]{1, 0, 1, 1});
 
-    // ? could be removed
-  /*  assertAnalyzesTo(analyzer, "term1 term2",
-        new String[]{"synonymterm", "term1" , "term2"},
+    assertAnalyzesTo(analyzer, "term1 terma",
+        new String[]{"synonymterma", "term1" , "terma"},
         new int[]{1, 0, 1});
+/*
+    assertAnalyzesTo(analyzer, "term1 dummyterm1  dummyterm2 term2",
+        new String[]{"synonymterm", "term1" , "dummyterm1", "dummyterm2", "term2"},
+        new int[]{1, 0, 1, 1, 1});
 */
+
+    // ? could be removed
+   /* assertAnalyzesTo(analyzer, "term1 term2",
+        new String[]{"synonymterm1", "term1" , "term2"},
+        new int[]{1, 0, 1});*/
+/*
+    assertAnalyzesTo(analyzer, "termA termB",
+        new String[]{"synonymtermA", "termA" , "termB"},
+        new int[]{1, 0, 1});*/
+
     analyzer.close();
   }
 

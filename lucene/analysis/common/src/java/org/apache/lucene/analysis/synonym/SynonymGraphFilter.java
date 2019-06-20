@@ -352,22 +352,34 @@ public final class SynonymGraphFilter extends TokenFilter {
       //System.out.println("    cycle term=" + new String(buffer, 0, bufferLen));
 
 
-      System.out.println(termAtt.toString());
-      FST.Arc<BytesRef> saveState = new FST.Arc<>();
-      saveState.copyFrom(scratchArc);
 
-      // try to match ?
-      if (fst.findTargetArc('?', scratchArc, scratchArc, fstReader) != null){
-      } else {
-        scratchArc.copyFrom(saveState);
 
         // Run each char in this token through the FST:
+        FST.Arc<BytesRef> saveState = new FST.Arc<>();
+
+        int numQMarks = 0;
         int bufUpto = 0;
-        byCar:
         while (bufUpto < bufferLen) {
           final int codePoint = Character.codePointAt(buffer, bufUpto, bufferLen);
+          if (numQMarks == 0){
+          saveState.copyFrom(scratchArc);
           if (fst.findTargetArc(ignoreCase ? Character.toLowerCase(codePoint) : codePoint, scratchArc, scratchArc, fstReader) == null) {
-            break byToken;
+            // try to match ?
+            scratchArc.copyFrom(saveState);
+            if (numQMarks == 0) {
+              while (fst.findTargetArc('?', scratchArc, scratchArc, fstReader) != null){
+                numQMarks++;
+                saveState.copyFrom(scratchArc);
+                if (fst.findTargetArc(SynonymMap.WORD_SEPARATOR, scratchArc, scratchArc, fstReader) == null){
+                  break;
+                }
+              }
+              scratchArc.copyFrom(saveState);
+              if (numQMarks == 0) {
+                break byToken;
+              }
+            }
+          }
           }
 
           // Accum the output
@@ -376,7 +388,6 @@ public final class SynonymGraphFilter extends TokenFilter {
         }
 
         assert bufUpto == bufferLen;
-      }
 
       // OK, entire token matched; now see if this is a final
       // state in the FST (a match):
