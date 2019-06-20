@@ -230,6 +230,25 @@ public class TestSynonymGraphFilter extends BaseTokenStreamTestCase {
     analyzer.close();
   }
 
+  public void testInsertionInSynonymFile() throws Exception {
+    String testFile =
+        "term1 ? term2, synonymterm";
+
+    Analyzer analyzer = solrSynsToAnalyzer(testFile);
+
+    // ? could be replaced by any term
+    assertAnalyzesTo(analyzer, "term1 dummyterm term2",
+        new String[]{"synonymterm", "term1" , "dummyterm", "term2"},
+        new int[]{1, 0, 1, 1});
+
+    // ? could be removed
+  /*  assertAnalyzesTo(analyzer, "term1 term2",
+        new String[]{"synonymterm", "term1" , "term2"},
+        new int[]{1, 0, 1});
+*/
+    analyzer.close();
+  }
+
   public void testBufferLength() throws Exception {
     String testFile =
         "c => 8 2 5 6 7\n" +

@@ -351,20 +351,32 @@ public final class SynonymGraphFilter extends TokenFilter {
       matchLength++;
       //System.out.println("    cycle term=" + new String(buffer, 0, bufferLen));
 
-      // Run each char in this token through the FST:
-      int bufUpto = 0;
-      while (bufUpto < bufferLen) {
-        final int codePoint = Character.codePointAt(buffer, bufUpto, bufferLen);
-        if (fst.findTargetArc(ignoreCase ? Character.toLowerCase(codePoint) : codePoint, scratchArc, scratchArc, fstReader) == null) {
-          break byToken;
+
+      System.out.println(termAtt.toString());
+      FST.Arc<BytesRef> saveState = new FST.Arc<>();
+      saveState.copyFrom(scratchArc);
+
+      // try to match ?
+      if (fst.findTargetArc('?', scratchArc, scratchArc, fstReader) != null){
+      } else {
+        scratchArc.copyFrom(saveState);
+
+        // Run each char in this token through the FST:
+        int bufUpto = 0;
+        byCar:
+        while (bufUpto < bufferLen) {
+          final int codePoint = Character.codePointAt(buffer, bufUpto, bufferLen);
+          if (fst.findTargetArc(ignoreCase ? Character.toLowerCase(codePoint) : codePoint, scratchArc, scratchArc, fstReader) == null) {
+            break byToken;
+          }
+
+          // Accum the output
+          pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
+          bufUpto += Character.charCount(codePoint);
         }
 
-        // Accum the output
-        pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
-        bufUpto += Character.charCount(codePoint);
+        assert bufUpto == bufferLen;
       }
-
-      assert bufUpto == bufferLen;
 
       // OK, entire token matched; now see if this is a final
       // state in the FST (a match):
