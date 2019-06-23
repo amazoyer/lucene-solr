@@ -232,19 +232,37 @@ public class TestSynonymGraphFilter extends BaseTokenStreamTestCase {
 
   public void testInsertionInSynonymFile() throws Exception {
     String testFile =
-        "term1 ? term2, synonymterm1\n" +
-            "term1 terma, synonymterma";
+        "term ? termbis, synonymterm\n" +
+            "term terma, synonymterma";
 
     Analyzer analyzer = solrSynsToAnalyzer(testFile);
 
+
+    assertAnalyzesTo(analyzer, "term dummyterm termbis",
+        new String[]{"synonymterm", "term" , "dummyterm", "termbis"},
+        new int[]{1, 0, 1, 1});
+
+
+
+    assertAnalyzesTo(analyzer, "term terma",
+        new String[]{"synonymterma", "term" , "terma"},
+        new int[]{1, 0, 1});
+/*
+
+/*    assertAnalyzesTo(analyzer, "term1 term2",
+        new String[]{"synonymterm1", "term1" , "term2"},
+        new int[]{1, 0, 1});*/
+
+/*
     // ? could be replaced by any term
     assertAnalyzesTo(analyzer, "term1 dummyterm1 term2",
         new String[]{"synonymterm1", "term1" , "dummyterm1", "term2"},
         new int[]{1, 0, 1, 1});
 
+
     assertAnalyzesTo(analyzer, "term1 terma",
         new String[]{"synonymterma", "term1" , "terma"},
-        new int[]{1, 0, 1});
+        new int[]{1, 0, 1});*/
 /*
     assertAnalyzesTo(analyzer, "term1 dummyterm1  dummyterm2 term2",
         new String[]{"synonymterm", "term1" , "dummyterm1", "dummyterm2", "term2"},

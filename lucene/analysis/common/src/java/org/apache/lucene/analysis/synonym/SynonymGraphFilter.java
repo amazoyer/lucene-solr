@@ -305,6 +305,8 @@ public final class SynonymGraphFilter extends TokenFilter {
       
       // Pull next token's chars:
       final char[] buffer;
+      final BytesRef[] outputTokenBuffer;
+
       final int bufferLen;
       final int inputEndOffset;
 
@@ -312,8 +314,8 @@ public final class SynonymGraphFilter extends TokenFilter {
         // Still in our lookahead buffer
         BufferedInputToken token = lookahead.get(lookaheadUpto);
         lookaheadUpto++;
-        buffer = token.term.chars();
         bufferLen = token.term.length();
+        buffer = token.term.chars();
         inputEndOffset = token.endOffset;
         //System.out.println("    use buffer now max=" + lookahead.getMaxPos());
         if (matchStartOffset == -1) {
@@ -347,47 +349,65 @@ public final class SynonymGraphFilter extends TokenFilter {
           break;
         }
       }
+      outputTokenBuffer = new BytesRef[bufferLen];
 
       matchLength++;
       //System.out.println("    cycle term=" + new String(buffer, 0, bufferLen));
 
-
-
-
         // Run each char in this token through the FST:
         FST.Arc<BytesRef> saveState = new FST.Arc<>();
 
-        int numQMarks = 0;
+        // Run each char in this token through the FST:
+        FST.Arc<BytesRef> beforeSeparator = new FST.Arc<>();
+
+        boolean hasQMark = false;
+        boolean freeToken = false;
         int bufUpto = 0;
+
+        saveState.copyFrom(scratchArc);
+        byChar:
         while (bufUpto < bufferLen) {
           final int codePoint = Character.codePointAt(buffer, bufUpto, bufferLen);
-          if (numQMarks == 0){
-          saveState.copyFrom(scratchArc);
-          if (fst.findTargetArc(ignoreCase ? Character.toLowerCase(codePoint) : codePoint, scratchArc, scratchArc, fstReader) == null) {
-            // try to match ?
-            scratchArc.copyFrom(saveState);
-            if (numQMarks == 0) {
-              while (fst.findTargetArc('?', scratchArc, scratchArc, fstReader) != null){
-                numQMarks++;
-                saveState.copyFrom(scratchArc);
-                if (fst.findTargetArc(SynonymMap.WORD_SEPARATOR, scratchArc, scratchArc, fstReader) == null){
-                  break;
-                }
-              }
+
+          if (!freeToken) {
+            if (fst.findTargetArc(ignoreCase ? Character.toLowerCase(codePoint) : codePoint, scratchArc, scratchArc, fstReader) == null) {
+              // try to match ?
               scratchArc.copyFrom(saveState);
-              if (numQMarks == 0) {
+              if (fst.findTargetArc('?', scratchArc, scratchArc, fstReader) != null && !hasQMark) {
+                //matchLength++;
+                hasQMark = true;
+                beforeSeparator.copyFrom(scratchArc);
+                if (fst.findTargetArc(SynonymMap.WORD_SEPARATOR, scratchArc, scratchArc, fstReader) == null) {
+                  throw new RuntimeException("PB");
+                }
+
+              }
+
+              if (hasQMark) {
+                scratchArc.copyFrom(beforeSeparator);
+                freeToken = true;
+              } else {
+                scratchArc.copyFrom(saveState);
                 break byToken;
               }
+
+              // restart maching
+              bufUpto = 0;
+              continue byChar;
             }
-          }
           }
 
           // Accum the output
-          pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
+          //pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
+          outputTokenBuffer[bufUpto] = scratchArc.output;
           bufUpto += Character.charCount(codePoint);
         }
 
         assert bufUpto == bufferLen;
+
+        for (int i = 0; i< bufferLen ; i++){
+           pendingOutput = fst.outputs.add(pendingOutput, outputTokenBuffer[i]);
+        }
 
       // OK, entire token matched; now see if this is a final
       // state in the FST (a match):
