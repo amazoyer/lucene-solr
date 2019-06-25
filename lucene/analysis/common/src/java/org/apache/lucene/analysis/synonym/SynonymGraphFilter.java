@@ -368,8 +368,6 @@ public final class SynonymGraphFilter extends TokenFilter {
         byChar:
         while (bufUpto < bufferLen) {
           final int codePoint = Character.codePointAt(buffer, bufUpto, bufferLen);
-
-          if (!freeToken) {
             if (fst.findTargetArc(ignoreCase ? Character.toLowerCase(codePoint) : codePoint, scratchArc, scratchArc, fstReader) == null) {
               // try to match ?
               scratchArc.copyFrom(saveState);
@@ -380,22 +378,18 @@ public final class SynonymGraphFilter extends TokenFilter {
                 if (fst.findTargetArc(SynonymMap.WORD_SEPARATOR, scratchArc, scratchArc, fstReader) == null) {
                   throw new RuntimeException("PB");
                 }
-
-              }
-
-              if (hasQMark) {
                 scratchArc.copyFrom(beforeSeparator);
                 freeToken = true;
+                // restart maching
+                bufUpto = 0;
+                continue byChar;
               } else {
-                scratchArc.copyFrom(saveState);
-                break byToken;
+                if (!freeToken) {
+                  scratchArc.copyFrom(saveState);
+                  break byToken;
+                }
               }
-
-              // restart maching
-              bufUpto = 0;
-              continue byChar;
             }
-          }
 
           // Accum the output
           //pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
