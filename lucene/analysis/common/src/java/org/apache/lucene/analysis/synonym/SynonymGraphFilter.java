@@ -374,17 +374,11 @@ public final class SynonymGraphFilter extends TokenFilter {
               if (fst.findTargetArc('?', scratchArc, scratchArc, fstReader) != null && !hasQMark) {
                 //matchLength++;
                 hasQMark = true;
-                beforeSeparator.copyFrom(scratchArc);
-                if (fst.findTargetArc(SynonymMap.WORD_SEPARATOR, scratchArc, scratchArc, fstReader) == null) {
-                  throw new RuntimeException("PB");
-                }
-                scratchArc.copyFrom(beforeSeparator);
-                freeToken = true;
                 // restart maching
                 bufUpto = 0;
                 continue byChar;
               } else {
-                if (!freeToken) {
+                if (!hasQMark) {
                   scratchArc.copyFrom(saveState);
                   break byToken;
                 }
