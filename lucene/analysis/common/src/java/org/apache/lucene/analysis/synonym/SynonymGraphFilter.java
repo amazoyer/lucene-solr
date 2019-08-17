@@ -357,11 +357,7 @@ public final class SynonymGraphFilter extends TokenFilter {
         // Run each char in this token through the FST:
         FST.Arc<BytesRef> saveState = new FST.Arc<>();
 
-        // Run each char in this token through the FST:
-        FST.Arc<BytesRef> beforeSeparator = new FST.Arc<>();
-
         boolean hasQMark = false;
-        boolean freeToken = false;
         int bufUpto = 0;
 
         saveState.copyFrom(scratchArc);
@@ -369,12 +365,16 @@ public final class SynonymGraphFilter extends TokenFilter {
         while (bufUpto < bufferLen) {
           final int codePoint = Character.codePointAt(buffer, bufUpto, bufferLen);
             if (fst.findTargetArc(ignoreCase ? Character.toLowerCase(codePoint) : codePoint, scratchArc, scratchArc, fstReader) == null) {
-              // try to match ?
+              // go back to the beginning of the term and try to match the ?
               scratchArc.copyFrom(saveState);
               if (fst.findTargetArc('?', scratchArc, scratchArc, fstReader) != null && !hasQMark) {
                 //matchLength++;
                 hasQMark = true;
                 // restart maching
+
+                if (fst.findTargetArc(SynonymMap.WORD_SEPARATOR, scratchArc, scratchArc, fstReader) == null) {
+                  System.out.println('?');
+                }
                 bufUpto = 0;
                 continue byChar;
               } else {
@@ -394,6 +394,7 @@ public final class SynonymGraphFilter extends TokenFilter {
         assert bufUpto == bufferLen;
 
         for (int i = 0; i< bufferLen ; i++){
+
            pendingOutput = fst.outputs.add(pendingOutput, outputTokenBuffer[i]);
         }
 
@@ -457,6 +458,21 @@ public final class SynonymGraphFilter extends TokenFilter {
   private void bufferOutputTokens(BytesRef bytes, int matchInputLength) {
     bytesReader.reset(bytes.bytes, bytes.offset, bytes.length);
 
+
+    for (int i =0;i<10;i++){
+      synonyms.words.get(i, scratchBytes);
+      scratchChars.copyUTF8Bytes(scratchBytes);
+      System.out.println(i+":"+scratchChars);
+
+    }
+
+    while (!bytesReader.eof()){
+      int value = bytesReader.readVInt();
+      synonyms.words.get(value, scratchBytes);
+      scratchChars.copyUTF8Bytes(scratchBytes);
+      System.out.println(value+":"+scratchChars);
+
+    }
     final int code = bytesReader.readVInt();
     final boolean keepOrig = (code & 0x1) == 0;
     //System.out.println("  buffer: keepOrig=" + keepOrig + " matchInputLength=" + matchInputLength);

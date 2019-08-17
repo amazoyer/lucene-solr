@@ -237,15 +237,73 @@ public class TestSynonymGraphFilter extends BaseTokenStreamTestCase {
 
     Analyzer analyzer = solrSynsToAnalyzer(testFile);
 
+    assertAnalyzesTo(analyzer, "term dummy termbis",
+        new String[]{"synonymterm", "term" , "dummy", "termbis"},
+        new int[]{1, 0, 1, 1});
 
+ /*   assertAnalyzesTo(analyzer, "term termbis",
+        new String[]{"synonymterm", "term" , "termbis"},
+        new int[]{1, 0, 1});*/
+
+   /* assertAnalyzesTo(analyzer, "term dummy termbis",
+        new String[]{"synonymterm", "term" , "dummy", "termbis"},
+        new int[]{1, 0, 1, 1});*/
+/*
+    assertAnalyzesTo(analyzer, "term terma",
+        new String[]{"synonymterma", "term" , "terma"},
+        new int[]{1, 0, 1});*/
+
+/*    assertAnalyzesTo(analyzer, "term termbis",
+        new String[]{"synonymterm", "term" , "termbis"},
+        new int[]{1, 0, 1});*/
+
+/*    assertAnalyzesTo(analyzer, "term terma",
+        new String[]{"synonymterma", "term" , "terma"},
+        new int[]{1, 0, 1});*/
+/*
+    assertAnalyzesTo(analyzer, "term termbis",
+        new String[]{"synonymterm", "term" , "termbis"},
+        new int[]{1, 0, 1});*/
+
+   /* assertAnalyzesTo(analyzer, "term termdummy termbis",
+        new String[]{"synonymterm", "term" , "termdummy", "termbis"},
+        new int[]{1, 0, 1, 1});*/
+
+    /*assertAnalyzesTo(analyzer, "term termdummy termbis",
+        new String[]{"synonymterm", "term" , "termdummy", "termbis"},
+        new int[]{1, 0, 1, 1});*/
+
+  /*  assertAnalyzesTo(analyzer, "term termdummy termbis",
+        new String[]{"synonymterm", "term" , "termdummy", "termbis"},
+        new int[]{1, 0, 1, 1});
+*/
+  /*  assertAnalyzesTo(analyzer, "term termbis",
+        new String[]{"synonymterm", "term" , "termbis"},
+        new int[]{1, 0, 1});*/
+
+/*    assertAnalyzesTo(analyzer, "term termdummy termbis",
+        new String[]{"synonymterm", "term" , "termdummy", "termbis"},
+        new int[]{1, 0, 1, 1});
+
+    assertAnalyzesTo(analyzer, "term terma",
+        new String[]{"synonymterma", "term" , "terma"},
+        new int[]{1, 0, 1});*/
+
+  /*  assertAnalyzesTo(analyzer, "term termbis",
+        new String[]{"synonymterm", "term" , "termbis"},
+        new int[]{1, 0, 1});*/
+
+/*    assertAnalyzesTo(analyzer, "term termbis",
+        new String[]{"synonymterm", "term" , "termbis"},
+        new int[]{1, 0, 1});*/
+/*
     assertAnalyzesTo(analyzer, "term termdummy termbis",
         new String[]{"synonymterm", "term" , "termdummy", "termbis"},
         new int[]{1, 0, 1, 1});
 
-
     assertAnalyzesTo(analyzer, "term terma",
         new String[]{"synonymterma", "term" , "terma"},
-        new int[]{1, 0, 1});
+        new int[]{1, 0, 1});*/
 
 
 
