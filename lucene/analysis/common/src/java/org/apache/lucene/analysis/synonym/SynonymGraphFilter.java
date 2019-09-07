@@ -299,12 +299,16 @@ public final class SynonymGraphFilter extends TokenFilter {
     int lookaheadUpto = lookaheadNextRead;
     matchStartOffset = -1;
 
+    boolean hasQMarkToUse = false;
+
     byToken:
     while (true) {
       //System.out.println("  cycle lookaheadUpto=" + lookaheadUpto + " maxPos=" + lookahead.getMaxPos());
       
       // Pull next token's chars:
       final char[] buffer;
+      final BytesRef[] outputTokenBuffer;
+
       final int bufferLen;
       final int inputEndOffset;
 
@@ -312,8 +316,8 @@ public final class SynonymGraphFilter extends TokenFilter {
         // Still in our lookahead buffer
         BufferedInputToken token = lookahead.get(lookaheadUpto);
         lookaheadUpto++;
-        buffer = token.term.chars();
         bufferLen = token.term.length();
+        buffer = token.term.chars();
         inputEndOffset = token.endOffset;
         //System.out.println("    use buffer now max=" + lookahead.getMaxPos());
         if (matchStartOffset == -1) {
@@ -347,24 +351,81 @@ public final class SynonymGraphFilter extends TokenFilter {
           break;
         }
       }
+      outputTokenBuffer = new BytesRef[bufferLen];
 
       matchLength++;
       //System.out.println("    cycle term=" + new String(buffer, 0, bufferLen));
 
-      // Run each char in this token through the FST:
-      int bufUpto = 0;
-      while (bufUpto < bufferLen) {
-        final int codePoint = Character.codePointAt(buffer, bufUpto, bufferLen);
-        if (fst.findTargetArc(ignoreCase ? Character.toLowerCase(codePoint) : codePoint, scratchArc, scratchArc, fstReader) == null) {
-          break byToken;
+        // Run each char in this token through the FST:
+        FST.Arc<BytesRef> saveState = new FST.Arc<>();
+
+        // Run each char in this token through the FST:
+        FST.Arc<BytesRef> beforeSeparator = new FST.Arc<>();
+
+        boolean freeToken = false;
+        int bufUpto = 0;
+
+        saveState.copyFrom(scratchArc);
+        boolean isUsingQMark = false;
+
+        byChar:
+        while (bufUpto < bufferLen) {
+          final int codePoint = Character.codePointAt(buffer, bufUpto, bufferLen);
+           if (!isUsingQMark) {
+             if (fst.findTargetArc(ignoreCase ? Character.toLowerCase(codePoint) : codePoint, scratchArc, scratchArc, fstReader) == null) {
+               // we did not manage to match character, let's try to see if we have ? in stock
+               if (hasQMarkToUse) {
+                 //System.out.println("Fortunatly we have this ?, so we do as if we are still matching the stuff");
+                 hasQMarkToUse = false;
+                 isUsingQMark = true;
+                 // restart maching
+                 bufUpto = 0;
+                 scratchArc.copyFrom(saveState);
+                 continue byChar;
+               }
+               // ok let's try to match ?
+               scratchArc.copyFrom(saveState);
+               if (fst.findTargetArc('?', scratchArc, scratchArc, fstReader) != null) {
+
+                 //System.out.println("Matched : ? in synonym list");
+                 pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
+
+                 if (fst.findTargetArc(SynonymMap.WORD_SEPARATOR, scratchArc, scratchArc, fstReader) != null) {
+                   pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
+
+                   //System.out.println("Matched : separator after ?");
+                 }
+                 //matchLength++;
+                 hasQMarkToUse = true;
+                 // restart maching
+                 bufUpto = 0;
+                 continue byChar;
+               } else {
+                     // we did not manage to match character, and no ? was match before, we are in deep shit, captain.
+                     scratchArc.copyFrom(saveState);
+                     break byToken;
+               }
+             }
+           }
+
+          // Accum the output
+          //pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
+          outputTokenBuffer[bufUpto] = scratchArc.output;
+          // System.out.println("Accum output : "+scratchArc.output+" at "+bufUpto);
+          bufUpto += Character.charCount(codePoint);
         }
 
-        // Accum the output
-        pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
-        bufUpto += Character.charCount(codePoint);
-      }
+     //S System.out.println("----->  Adding term of size : "+bufUpto);
 
       assert bufUpto == bufferLen;
+
+        for (int i = 0; i< bufferLen ; i++){
+          pendingOutput = fst.outputs.add(pendingOutput, outputTokenBuffer[i]);
+         /* System.out.print("Pending output : "+outputTokenBuffer[i]+" at "+i + " gives ");
+          System.out.println(pendingOutput.length + " "+Arrays.asList(pendingOutput).stream().map(BytesRef::toString).collect(Collectors.joining(",")));
+          System.out.println(scratchArc.toString());
+*/
+        }
 
       // OK, entire token matched; now see if this is a final
       // state in the FST (a match):
@@ -372,25 +433,32 @@ public final class SynonymGraphFilter extends TokenFilter {
         matchOutput = fst.outputs.add(pendingOutput, scratchArc.nextFinalOutput);
         matchInputLength = matchLength;
         matchEndOffset = inputEndOffset;
-        //System.out.println("    ** match");
+
+        //System.out.println("MATCH --- MATCH --- MATCH --- MATCH --- MATCH --- MATCH --- MATCH --- MATCH --- MATCH --- MATCH --- MATCH --- MATCH --- MATCH --- MATCH ");
+      }
+
+      if (isUsingQMark){
+        scratchArc.copyFrom(saveState);
+      } else {
+        if (fst.findTargetArc(SynonymMap.WORD_SEPARATOR, scratchArc, scratchArc, fstReader) == null) {
+          // No further rules can match here; we're done
+          // searching for matching rules starting at the
+          // current input position.
+          break;
+        }
       }
 
       // See if the FST can continue matching (ie, needs to
       // see the next input token):
-      if (fst.findTargetArc(SynonymMap.WORD_SEPARATOR, scratchArc, scratchArc, fstReader) == null) {
-        // No further rules can match here; we're done
-        // searching for matching rules starting at the
-        // current input position.
-        break;
-      } else {
+
         // More matching is possible -- accum the output (if
         // any) of the WORD_SEP arc:
+
         pendingOutput = fst.outputs.add(pendingOutput, scratchArc.output);
         doFinalCapture = true;
         if (liveToken) {
           capture();
         }
-      }
     }
 
     if (doFinalCapture && liveToken && finished == false) {
@@ -466,7 +534,6 @@ public final class SynonymGraphFilter extends TokenFilter {
       assert path.size() > 0;
       totalPathNodes += path.size() - 1;
     }
-    //System.out.println("  totalPathNodes=" + totalPathNodes);
 
     // 2nd pass: buffer tokens for the graph fragment
 
